@@ -1,6 +1,6 @@
 {
   "name": "lastfm-cd-scrobbler",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Last.fm CD scrobbler given a Discogs release ID",
   "keywords": [
     "lastfm",
