@@ -1,0 +1,47 @@
+{
+  "name": "lastfm-cd-scrobbler",
+  "version": "0.1.0",
+  "description": "Last.fm CD scrobbler given a Discogs release ID",
+  "keywords": [
+    "lastfm",
+    "scrobbling",
+    "discogs"
+  ],
+  "main": "dist/src/index.js",
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "lastfm-cd-scrobbler": "dist/bin/lastfm-cd-scrobbler.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DenisFrezzato/lastfm-cd-scrobbler.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "lint": "tslint --project . -t verbose"
+  },
+  "author": "Denis Frezzato <denis.frezzato@tutanota.com>",
+  "license": "MIT",
+  "dependencies": {
+    "fp-ts": "^2.0.5",
+    "fp-ts-contrib": "^0.1.2",
+    "io-ts": "^2.0.1",
+    "io-ts-types": "^0.5.0",
+    "md5": "^2.2.1",
+    "node-fetch": "^2.6.0",
+    "open": "^6.4.0"
+  },
+  "devDependencies": {
+    "@types/md5": "^2.1.33",
+    "@types/node-fetch": "^2.5.0",
+    "prettier": "^1.18.2",
+    "tslint": "^5.18.0",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-config-standard": "^8.0.1",
+    "typescript": "^3.5.3",
+    "typestrict": "^1.0.2"
+  }
+}
