@@ -2,7 +2,7 @@ import * as E from 'fp-ts/lib/Either'
 import { flow } from 'fp-ts/lib/function'
 import { pipe } from 'fp-ts/lib/pipeable'
 import * as TE from 'fp-ts/lib/TaskEither'
-import * as t from 'io-ts'
+import * as D from 'io-ts/lib/Decoder'
 import nodeFetch, { RequestInfo, RequestInit, Response } from 'node-fetch'
 import { failureToError } from './error'
 
@@ -30,13 +30,13 @@ const failureToErrorTE = flow(
   TE.fromEither,
 )
 
-export const fetchJson = <A, O>(
-  model: t.Type<A, O>,
+export const fetchJson = <A>(
+  codec: D.Decoder<A>,
   url: RequestInfo,
   init?: RequestInit,
 ): TE.TaskEither<Error, A> =>
   pipe(
     fetch(url, init),
     TE.chain((res) => TE.tryCatch(() => res.json(), E.toError)),
-    TE.chain((u) => failureToErrorTE(model.decode(u))),
+    TE.chain((u) => failureToErrorTE(codec.decode(u))),
   )

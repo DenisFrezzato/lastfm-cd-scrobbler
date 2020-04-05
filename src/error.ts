@@ -1,8 +1,16 @@
 import * as E from 'fp-ts/lib/Either'
-import * as t from 'io-ts'
-import { failure } from 'io-ts/lib/PathReporter'
+import { flow } from 'fp-ts/lib/function'
+import { NonEmptyArray } from 'fp-ts/lib/NonEmptyArray'
+import * as T from 'fp-ts/lib/Tree'
+import { draw } from 'io-ts/lib/Tree'
 
 export const failureToError = <A>(
-  e: E.Either<t.Errors, A>,
+  e: E.Either<NonEmptyArray<T.Tree<string>>, A>,
 ): E.Either<Error, A> =>
-  E.either.mapLeft(e, (errors) => new Error(failure(errors).join('')))
+  E.either.mapLeft(
+    e,
+    flow(
+      draw,
+      (m) => new Error(m),
+    ),
+  )

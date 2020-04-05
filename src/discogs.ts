@@ -1,26 +1,22 @@
 import * as TE from 'fp-ts/lib/TaskEither'
-import * as t from 'io-ts'
+import * as D from 'io-ts/lib/Decoder'
 
 import { fetchJson } from './fetch'
 
 const createUrl = (endpoint: string) => `https://api.discogs.com${endpoint}`
 
-const ReleaseResponse = t.type({
-  title: t.string,
-  artists: t.array(
-    t.type({
-      name: t.string,
-    }),
-  ),
-  tracklist: t.array(
-    t.type({
-      duration: t.string,
-      position: t.string,
-      title: t.string,
+const ReleaseResponse = D.type({
+  title: D.string,
+  artists: D.array(D.type({ name: D.string })),
+  tracklist: D.array(
+    D.type({
+      duration: D.string,
+      position: D.string,
+      title: D.string,
     }),
   ),
 })
-export type ReleaseResponse = t.TypeOf<typeof ReleaseResponse>
+export interface ReleaseResponse extends D.TypeOf<typeof ReleaseResponse> {}
 
 export const findRelease = (
   releaseId: number,

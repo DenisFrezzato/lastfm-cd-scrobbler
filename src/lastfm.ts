@@ -4,7 +4,7 @@ import * as Ord from 'fp-ts/lib/Ord'
 import { pipe } from 'fp-ts/lib/pipeable'
 import * as R from 'fp-ts/lib/Record'
 import * as TE from 'fp-ts/lib/TaskEither'
-import * as t from 'io-ts'
+import * as D from 'io-ts/lib/Decoder'
 import * as md5 from 'md5'
 import * as qs from 'querystring'
 
@@ -54,7 +54,7 @@ const createSignedUrl = (
   apiSecret: string,
 ): string => `${baseUrl}/?${signedQuery({ method, ...query }, apiSecret)}`
 
-const GetTokenResponse = t.type({ token: t.string })
+const GetTokenResponse = D.type({ token: D.string })
 
 export const getToken = (apiKey: string): TE.TaskEither<Error, string> =>
   pipe(
@@ -76,10 +76,10 @@ export const requestAuth = (
     })}`,
   )
 
-const GetSessionResponse = t.type({
-  session: t.type({
-    name: t.string,
-    key: t.string,
+const GetSessionResponse = D.type({
+  session: D.type({
+    name: D.string,
+    key: D.string,
   }),
 })
 
