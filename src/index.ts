@@ -34,26 +34,40 @@ const nowInSeconds: TE.TaskEither<never, number> = TE.taskEither.map(
   (ms) => Math.floor(ms / 1000),
 )
 
-const findReleaseById: TE.TaskEither<AppError, dgs.ReleaseResponse> = Do(
-  TE.taskEither,
+const findReleaseById: TE.TaskEither<AppError, dgs.ReleaseResponse> = pipe(
+  decodeReleaseId(process.argv[2]),
+  TE.bindTo('releaseId'),
+  TE.bind('release', ({ releaseId }) => dgs.findRelease(releaseId)),
+  TE.chainW(({ release }) =>
+    pipe(
+      log(`Release found: ${release.artists[0].name} - ${release.title}`),
+      TE.map(() => release),
+    ),
+  ),
 )
-  .bind('releaseId', decodeReleaseId(process.argv[2]))
-  .doL(({ releaseId }) => log(`Looking for release ${releaseId} on Discogs...`))
-  .bindL('release', ({ releaseId }) => dgs.findRelease(releaseId))
-  .doL(({ release }) =>
-    log(`Release found: ${release.artists[0].name} - ${release.title}`),
-  )
-  .return((_) => _.release)
 
-const authoriseAndCacheSessionKey: TE.TaskEither<AppError, string> = Do(
-  TE.taskEither,
+const authoriseAndCacheSessionKey: TE.TaskEither<AppError, string> = pipe(
+  lfm.getToken(apiKey),
+  TE.bindTo('token'),
+  TE.chainW((S) =>
+    pipe(
+      lfm.requestAuth(apiKey, S.token),
+      TE.chain(() =>
+        TE.rightTask(waitForConfirm('Authorise on Last.fm and press Enter ')),
+      ),
+      TE.map(() => S),
+    ),
+  ),
+  TE.bind('sessionKey', ({ token }) =>
+    lfm.getSession(apiKey, apiSecret, token),
+  ),
+  TE.chainW(({ sessionKey }) =>
+    pipe(
+      fs.writeFile(sessionKeyFilePath, sessionKey),
+      TE.map(() => sessionKey),
+    ),
+  ),
 )
-  .bind('token', lfm.getToken(apiKey))
-  .doL(({ token }) => lfm.requestAuth(apiKey, token))
-  .do(TE.rightTask(waitForConfirm('Authorise on Last.fm and press Enter ')))
-  .bindL('sessionKey', ({ token }) => lfm.getSession(apiKey, apiSecret, token))
-  .doL(({ sessionKey }) => fs.writeFile(sessionKeyFilePath, sessionKey))
-  .return((_) => _.sessionKey)
 
 const formatReleaseToLastFMTracks = (
   release: dgs.ReleaseResponse,
