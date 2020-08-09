@@ -1,31 +1,32 @@
-import * as TE from 'fp-ts/lib/TaskEither'
-import * as t from 'io-ts'
+import * as TE from 'fp-ts/TaskEither'
+import * as D from 'io-ts/lib/Decoder'
 
 import { fetchJson } from './fetch'
+import { AppError } from './commonErrors'
 
 const createUrl = (endpoint: string) => `https://api.discogs.com${endpoint}`
 
-const ReleaseResponse = t.type({
-  title: t.string,
-  artists: t.array(
-    t.type({
-      name: t.string,
+const ReleaseResponse = D.type({
+  title: D.string,
+  artists: D.array(
+    D.type({
+      name: D.string,
     }),
   ),
-  tracklist: t.array(
-    t.type({
-      duration: t.string,
-      position: t.string,
-      title: t.string,
+  tracklist: D.array(
+    D.type({
+      duration: D.string,
+      position: D.string,
+      title: D.string,
     }),
   ),
 })
-export type ReleaseResponse = t.TypeOf<typeof ReleaseResponse>
+export interface ReleaseResponse extends D.TypeOf<typeof ReleaseResponse> {}
 
-export const findRelease = (
+export function findRelease(
   releaseId: number,
-): TE.TaskEither<Error, ReleaseResponse> =>
-  TE.taskEither.map(
+): TE.TaskEither<AppError, ReleaseResponse> {
+  return TE.taskEither.map(
     fetchJson(ReleaseResponse, createUrl(`/releases/${releaseId}`)),
     (release) => ({
       ...release,
@@ -36,3 +37,4 @@ export const findRelease = (
       })),
     }),
   )
+}

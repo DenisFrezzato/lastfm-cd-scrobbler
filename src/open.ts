@@ -1,10 +1,14 @@
-import { toError } from 'fp-ts/lib/Either'
-import { constVoid } from 'fp-ts/lib/function'
-import * as TE from 'fp-ts/lib/TaskEither'
+import { constVoid, pipe } from 'fp-ts/function'
+import * as TE from 'fp-ts/TaskEither'
 import * as opn from 'open'
+import { SomeException, toSomeException } from './commonErrors'
 
-export const open = (
+export function open(
   target: string,
   options?: opn.Options,
-): TE.TaskEither<Error, void> =>
-  TE.taskEither.map(TE.tryCatch(() => opn(target, options), toError), constVoid)
+): TE.TaskEither<SomeException, void> {
+  return pipe(
+    TE.tryCatch(() => opn(target, options), toSomeException),
+    TE.map(constVoid),
+  )
+}

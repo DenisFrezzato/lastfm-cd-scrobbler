@@ -1,42 +1,45 @@
-import * as E from 'fp-ts/lib/Either'
-import { flow } from 'fp-ts/lib/function'
-import { pipe } from 'fp-ts/lib/pipeable'
-import * as TE from 'fp-ts/lib/TaskEither'
-import * as t from 'io-ts'
+import { flow, pipe } from 'fp-ts/function'
+import * as TE from 'fp-ts/TaskEither'
+import * as D from 'io-ts/lib/Decoder'
 import nodeFetch, { RequestInfo, RequestInit, Response } from 'node-fetch'
 import { failureToError } from './error'
+import { toSomeException, AppError } from './commonErrors'
 
-export const fetch = (
+export interface RequestFailure {
+  _type: 'RequestFailure'
+  response: Response
+  body: string
+}
+
+function requestFailure(response: Response): (body: string) => RequestFailure {
+  return (body) => ({ _type: 'RequestFailure', response, body })
+}
+
+export function fetch(
   url: RequestInfo,
   init?: RequestInit,
-): TE.TaskEither<Error, Response> =>
-  pipe(
-    TE.tryCatch(() => nodeFetch(url, init), E.toError),
+): TE.TaskEither<AppError, Response> {
+  return pipe(
+    TE.tryCatch(() => nodeFetch(url, init), toSomeException),
     TE.chain((res) =>
       res.ok
         ? TE.right(res)
-        : TE.taskEither.chain(
-            TE.tryCatch(() => res.text(), E.toError),
-            flow(
-              E.toError,
-              TE.left,
-            ),
+        : pipe(
+            TE.tryCatch<AppError, string>(() => res.text(), toSomeException),
+            TE.chainW(flow(requestFailure(res), TE.left)),
           ),
     ),
   )
+}
 
-const failureToErrorTE = flow(
-  failureToError,
-  TE.fromEither,
-)
-
-export const fetchJson = <A, O>(
-  model: t.Type<A, O>,
+export function fetchJson<A>(
+  codec: D.Decoder<unknown, A>,
   url: RequestInfo,
   init?: RequestInit,
-): TE.TaskEither<Error, A> =>
-  pipe(
+): TE.TaskEither<AppError, A> {
+  return pipe(
     fetch(url, init),
-    TE.chain((res) => TE.tryCatch(() => res.json(), E.toError)),
-    TE.chain((u) => failureToErrorTE(model.decode(u))),
+    TE.chainW((res) => TE.tryCatch(() => res.json(), toSomeException)),
+    TE.chainW(flow(codec.decode, failureToError, TE.fromEither)),
   )
+}

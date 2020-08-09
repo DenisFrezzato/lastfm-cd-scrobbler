@@ -1,15 +1,15 @@
-import * as A from 'fp-ts/lib/Array'
-import { flow, identity } from 'fp-ts/lib/function'
-import * as Ord from 'fp-ts/lib/Ord'
-import { pipe } from 'fp-ts/lib/pipeable'
-import * as R from 'fp-ts/lib/Record'
-import * as TE from 'fp-ts/lib/TaskEither'
-import * as t from 'io-ts'
+import * as A from 'fp-ts/Array'
+import { pipe, flow, identity } from 'fp-ts/function'
+import * as Ord from 'fp-ts/Ord'
+import * as R from 'fp-ts/Record'
+import * as TE from 'fp-ts/TaskEither'
+import * as D from 'io-ts/lib/Decoder'
 import * as md5 from 'md5'
 import * as qs from 'querystring'
 
 import { fetch, fetchJson } from './fetch'
 import { open } from './open'
+import { SomeException, AppError } from './commonErrors'
 
 type QueryRecord = Record<string, string | number>
 type QueryTuple = [string, string | number]
@@ -22,8 +22,9 @@ export interface Track {
 }
 const baseUrl = 'https://ws.audioscrobbler.com/2.0'
 
-const createUrl = (method: string, query?: QueryRecord): string =>
-  `${baseUrl}/?${qs.stringify({ method, ...query })}`
+function createUrl(method: string, query?: QueryRecord): string {
+  return `${baseUrl}/?${qs.stringify({ method, ...query })}`
+}
 
 const byKey = Ord.contramap((tuple: QueryTuple) => tuple[0])(Ord.ordString)
 const concatKeyValues: (as: QueryTuple[]) => string = A.reduce(
@@ -43,52 +44,56 @@ const createSignature: (apiSecret: string) => (query: QueryRecord) => string = (
     md5,
   )
 
-const signedQuery = (query: QueryRecord, apiSecret: string): string => {
+function signedQuery(query: QueryRecord, apiSecret: string): string {
   const signature = createSignature(apiSecret)(query)
   return qs.stringify({ ...query, api_sig: signature })
 }
 
-const createSignedUrl = (
+function createSignedUrl(
   method: string,
   query: QueryRecord,
   apiSecret: string,
-): string => `${baseUrl}/?${signedQuery({ method, ...query }, apiSecret)}`
+): string {
+  return `${baseUrl}/?${signedQuery({ method, ...query }, apiSecret)}`
+}
 
-const GetTokenResponse = t.type({ token: t.string })
+const GetTokenResponse = D.type({ token: D.string })
 
-export const getToken = (apiKey: string): TE.TaskEither<Error, string> =>
-  pipe(
+export function getToken(apiKey: string): TE.TaskEither<AppError, string> {
+  return pipe(
     fetchJson(
       GetTokenResponse,
       createUrl('auth.gettoken', { api_key: apiKey, format: 'json' }),
     ),
     TE.map((_) => _.token),
   )
+}
 
-export const requestAuth = (
+export function requestAuth(
   apiKey: string,
   token: string,
-): TE.TaskEither<Error, void> =>
-  open(
+): TE.TaskEither<SomeException, void> {
+  return open(
     `http://www.last.fm/api/auth/?${qs.stringify({
       api_key: apiKey,
       token,
     })}`,
   )
+}
 
-const GetSessionResponse = t.type({
-  session: t.type({
-    name: t.string,
-    key: t.string,
+const GetSessionResponse = D.type({
+  session: D.type({
+    name: D.string,
+    key: D.string,
   }),
 })
 
-export const getSession = (
+export function getSession(
   apiKey: string,
   apiSecret: string,
   token: string,
-): TE.TaskEither<Error, string> =>
-  pipe(
+): TE.TaskEither<AppError, string> {
+  return pipe(
     fetchJson(
       GetSessionResponse,
       createSignedUrl(
@@ -99,15 +104,16 @@ export const getSession = (
     ),
     TE.map((_) => _.session.key),
   )
+}
 
 const paramWithIndex = (index: number) => (name: string): string =>
   `${name}[${index}]`
 
-const createScrobbleIndexedParams = (
+function createScrobbleIndexedParams(
   index: number,
   track: Track,
   timestamp: number,
-): QueryRecord => {
+): QueryRecord {
   const withIndex = paramWithIndex(index)
 
   return {
@@ -126,13 +132,13 @@ const createScrobbleIndexedParams = (
   }
 }
 
-export const scrobble = (
+export function scrobble(
   apiKey: string,
   apiSecret: string,
   sessionKey: string,
   tracks: Track[],
   timestamp: number,
-): TE.TaskEither<Error, unknown> => {
+): TE.TaskEither<AppError, unknown> {
   const tracksQuery = tracks.reduce<QueryRecord>(
     (acc, track, i) => ({
       ...acc,

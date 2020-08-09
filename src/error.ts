@@ -1,8 +1,10 @@
-import * as E from 'fp-ts/lib/Either'
-import * as t from 'io-ts'
-import { failure } from 'io-ts/lib/PathReporter'
+import * as E from 'fp-ts/Either'
+import * as D from 'io-ts/lib/Decoder'
+import { pipe, flow } from 'fp-ts/function'
+import { unexpectedValue, UnexpectedValue } from './commonErrors'
 
-export const failureToError = <A>(
-  e: E.Either<t.Errors, A>,
-): E.Either<Error, A> =>
-  E.either.mapLeft(e, (errors) => new Error(failure(errors).join('')))
+export function failureToError<A>(
+  e: E.Either<D.DecodeError, A>,
+): E.Either<UnexpectedValue, A> {
+  return pipe(e, E.mapLeft(flow(D.draw, unexpectedValue)))
+}
