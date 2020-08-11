@@ -10,6 +10,7 @@ import * as qs from 'querystring'
 import { fetch, fetchJson } from './fetch'
 import { open } from './open'
 import { SomeException, AppError } from './commonErrors'
+import { Newtype, iso } from 'newtype-ts'
 
 type QueryRecord = Record<string, string | number>
 type QueryTuple = [string, string | number]
@@ -57,29 +58,36 @@ function createSignedUrl(
   return `${baseUrl}/?${signedQuery({ method, ...query }, apiSecret)}`
 }
 
+interface Token extends Newtype<{ readonly Token: unique symbol }, string> {}
+const Token = iso<Token>()
+
 const GetTokenResponse = D.type({ token: D.string })
 
-export function getToken(apiKey: string): TE.TaskEither<AppError, string> {
+export function getToken(apiKey: string): TE.TaskEither<AppError, Token> {
   return pipe(
     fetchJson(
       GetTokenResponse,
       createUrl('auth.gettoken', { api_key: apiKey, format: 'json' }),
     ),
-    TE.map((_) => _.token),
+    TE.map((_) => Token.wrap(_.token)),
   )
 }
 
 export function requestAuth(
   apiKey: string,
-  token: string,
+  token: Token,
 ): TE.TaskEither<SomeException, void> {
   return open(
     `http://www.last.fm/api/auth/?${qs.stringify({
       api_key: apiKey,
-      token,
+      token: Token.unwrap(token),
     })}`,
   )
 }
+
+export interface SessionKey
+  extends Newtype<{ readonly SessionKey: unique symbol }, string> {}
+export const SessionKey = iso<SessionKey>()
 
 const GetSessionResponse = D.type({
   session: D.type({
@@ -91,18 +99,18 @@ const GetSessionResponse = D.type({
 export function getSession(
   apiKey: string,
   apiSecret: string,
-  token: string,
-): TE.TaskEither<AppError, string> {
+  token: Token,
+): TE.TaskEither<AppError, SessionKey> {
   return pipe(
     fetchJson(
       GetSessionResponse,
       createSignedUrl(
         'auth.getsession',
-        { api_key: apiKey, token, format: 'json' },
+        { api_key: apiKey, token: Token.unwrap(token), format: 'json' },
         apiSecret,
       ),
     ),
-    TE.map((_) => _.session.key),
+    TE.map((_) => SessionKey.wrap(_.session.key)),
   )
 }
 
@@ -135,7 +143,7 @@ function createScrobbleIndexedParams(
 export function scrobble(
   apiKey: string,
   apiSecret: string,
-  sessionKey: string,
+  sessionKey: SessionKey,
   tracks: Track[],
   timestamp: number,
 ): TE.TaskEither<AppError, unknown> {
@@ -152,7 +160,7 @@ export function scrobble(
       'track.scrobble',
       {
         api_key: apiKey,
-        sk: sessionKey,
+        sk: SessionKey.unwrap(sessionKey),
         format: 'json',
         ...tracksQuery,
       },

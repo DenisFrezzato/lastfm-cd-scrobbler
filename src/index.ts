@@ -44,14 +44,17 @@ const findReleaseById: TE.TaskEither<AppError, dgs.ReleaseResponse> = pipe(
   TE.map((s) => s.release),
 )
 
-const authoriseAndCacheSessionKey: TE.TaskEither<AppError, string> = pipe(
+const authoriseAndCacheSessionKey: TE.TaskEither<
+  AppError,
+  lfm.SessionKey
+> = pipe(
   lfm.getToken(apiKey),
   TE.bindTo('token'),
-  TE.chainFirstW((S) =>
+  TE.chainFirstW((s) =>
     pipe(
-      lfm.requestAuth(apiKey, S.token),
+      lfm.requestAuth(apiKey, s.token),
       TE.chain(() =>
-        TE.rightTask(waitForConfirm('Authorise on Last.fm and press Enter ')),
+        TE.rightTask(waitForConfirm('Authorise on Last.fm and press Enter')),
       ),
     ),
   ),
@@ -59,7 +62,7 @@ const authoriseAndCacheSessionKey: TE.TaskEither<AppError, string> = pipe(
     lfm.getSession(apiKey, apiSecret, token),
   ),
   TE.chainFirstW(({ sessionKey }) =>
-    fs.writeFile(sessionKeyFilePath, sessionKey),
+    fs.writeFile(sessionKeyFilePath, lfm.SessionKey.unwrap(sessionKey)),
   ),
   TE.map((s) => s.sessionKey),
 )
@@ -83,7 +86,10 @@ export const main: TE.TaskEither<AppError, void> = Do(TE.taskEither)
   .sequenceS({
     sessionKey: pipe(
       fs.readFile(sessionKeyFilePath),
-      TE.fold(() => authoriseAndCacheSessionKey, flow(String, TE.right)),
+      TE.fold(
+        () => authoriseAndCacheSessionKey,
+        flow(String, (_) => lfm.SessionKey.wrap(_), TE.right),
+      ),
     ),
   })
   .doL(({ sessionKey, release, now }) =>

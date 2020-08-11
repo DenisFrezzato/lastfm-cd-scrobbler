@@ -4,7 +4,9 @@ import * as D from 'io-ts/lib/Decoder'
 import { fetchJson } from './fetch'
 import { AppError } from './commonErrors'
 
-const createUrl = (endpoint: string) => `https://api.discogs.com${endpoint}`
+function createUrl(endpoint: string) {
+  return `https://api.discogs.com${endpoint}`
+}
 
 const ReleaseResponse = D.type({
   title: D.string,
