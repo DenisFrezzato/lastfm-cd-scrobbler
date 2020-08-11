@@ -38,35 +38,30 @@ const findReleaseById: TE.TaskEither<AppError, dgs.ReleaseResponse> = pipe(
   decodeReleaseId(process.argv[2]),
   TE.bindTo('releaseId'),
   TE.bind('release', ({ releaseId }) => dgs.findRelease(releaseId)),
-  TE.chainW(({ release }) =>
-    pipe(
-      log(`Release found: ${release.artists[0].name} - ${release.title}`),
-      TE.map(() => release),
-    ),
+  TE.chainFirstW(({ release }) =>
+    pipe(log(`Release found: ${release.artists[0].name} - ${release.title}`)),
   ),
+  TE.map((s) => s.release),
 )
 
 const authoriseAndCacheSessionKey: TE.TaskEither<AppError, string> = pipe(
   lfm.getToken(apiKey),
   TE.bindTo('token'),
-  TE.chainW((S) =>
+  TE.chainFirstW((S) =>
     pipe(
       lfm.requestAuth(apiKey, S.token),
       TE.chain(() =>
         TE.rightTask(waitForConfirm('Authorise on Last.fm and press Enter ')),
       ),
-      TE.map(() => S),
     ),
   ),
   TE.bind('sessionKey', ({ token }) =>
     lfm.getSession(apiKey, apiSecret, token),
   ),
-  TE.chainW(({ sessionKey }) =>
-    pipe(
-      fs.writeFile(sessionKeyFilePath, sessionKey),
-      TE.map(() => sessionKey),
-    ),
+  TE.chainFirstW(({ sessionKey }) =>
+    fs.writeFile(sessionKeyFilePath, sessionKey),
   ),
+  TE.map((s) => s.sessionKey),
 )
 
 const formatReleaseToLastFMTracks = (
@@ -92,13 +87,16 @@ export const main: TE.TaskEither<AppError, void> = Do(TE.taskEither)
     ),
   })
   .doL(({ sessionKey, release, now }) =>
-    TE.taskEither.chain(log('Submitting tracks to Last.fm...'), () =>
-      lfm.scrobble(
-        apiKey,
-        apiSecret,
-        sessionKey,
-        formatReleaseToLastFMTracks(release),
-        now,
+    pipe(
+      log('Submitting tracks to Last.fm...'),
+      TE.chain(() =>
+        lfm.scrobble(
+          apiKey,
+          apiSecret,
+          sessionKey,
+          formatReleaseToLastFMTracks(release),
+          now,
+        ),
       ),
     ),
   )
