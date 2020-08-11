@@ -13,13 +13,15 @@ import * as fs from './fs'
 import * as lfm from './lastfm'
 import { waitForConfirm } from './readline'
 import { unexpectedValue, AppError } from './commonErrors'
+import * as T from 'fp-ts/Task'
 
 const sessionKeyFilePath = `${__dirname}/.sessionKey`
 
 const apiKey = '55d36c11988601f43ccca1b48cfc4e50'
 const apiSecret = '032c9abb27bcd586983ad7cf9c9bebeb'
 
-const log = flow(C.log, TE.rightIO)
+const logTE = flow(C.log, TE.rightIO)
+const logT = flow(C.log, T.fromIO)
 
 function decodeReleaseId(u: unknown): TE.TaskEither<AppError, number> {
   return pipe(
@@ -39,7 +41,7 @@ const findReleaseById: TE.TaskEither<AppError, dgs.ReleaseResponse> = pipe(
   TE.bindTo('releaseId'),
   TE.bind('release', ({ releaseId }) => dgs.findRelease(releaseId)),
   TE.chainFirstW(({ release }) =>
-    pipe(log(`Release found: ${release.artists[0].name} - ${release.title}`)),
+    pipe(logTE(`Release found: ${release.artists[0].name} - ${release.title}`)),
   ),
   TE.map((s) => s.release),
 )
@@ -77,33 +79,39 @@ const formatReleaseToLastFMTracks = (
     album: release.title,
   }))
 
-export const main: TE.TaskEither<AppError, void> = Do(TE.taskEither)
-  .do(TE.right<AppError, void>(undefined))
-  .sequenceS({
-    release: findReleaseById,
-    now: nowInSeconds,
-  })
-  .sequenceS({
-    sessionKey: pipe(
-      fs.readFile(sessionKeyFilePath),
-      TE.fold(
-        () => authoriseAndCacheSessionKey,
-        flow(String, (_) => lfm.SessionKey.wrap(_), TE.right),
-      ),
-    ),
-  })
-  .doL(({ sessionKey, release, now }) =>
-    pipe(
-      log('Submitting tracks to Last.fm...'),
-      TE.chain(() =>
-        lfm.scrobble(
-          apiKey,
-          apiSecret,
-          sessionKey,
-          formatReleaseToLastFMTracks(release),
-          now,
+export const main: T.Task<void> = pipe(
+  Do(TE.taskEither)
+    .do(TE.right<AppError, void>(undefined))
+    .sequenceS({
+      release: findReleaseById,
+      now: nowInSeconds,
+    })
+    .sequenceS({
+      sessionKey: pipe(
+        fs.readFile(sessionKeyFilePath),
+        TE.fold(
+          () => authoriseAndCacheSessionKey,
+          flow(String, (_) => lfm.SessionKey.wrap(_), TE.right),
         ),
       ),
-    ),
-  )
-  .return(constVoid)
+    })
+    .doL(({ sessionKey, release, now }) =>
+      pipe(
+        logTE('Submitting tracks to Last.fm...'),
+        TE.chain(() =>
+          lfm.scrobble(
+            apiKey,
+            apiSecret,
+            sessionKey,
+            formatReleaseToLastFMTracks(release),
+            now,
+          ),
+        ),
+      ),
+    )
+    .return(constVoid),
+  TE.fold(
+    (error) => logT(`Something went wrong: ${JSON.stringify(error)}`),
+    () => logT('Success!'),
+  ),
+)
