@@ -1,8 +1,7 @@
-import { Do } from 'fp-ts-contrib/lib/Do'
 import * as E from 'fp-ts/Either'
 import * as C from 'fp-ts/Console'
 import * as Date from 'fp-ts/Date'
-import { flow, constVoid } from 'fp-ts/function'
+import { flow } from 'fp-ts/function'
 import { pipe } from 'fp-ts/pipeable'
 import * as TE from 'fp-ts/TaskEither'
 import { IntFromString } from 'io-ts-types/lib/IntFromString'
@@ -80,36 +79,33 @@ const formatReleaseToLastFMTracks = (
   }))
 
 export const main: T.Task<void> = pipe(
-  Do(TE.taskEither)
-    .do(TE.right<AppError, void>(undefined))
-    .sequenceS({
-      release: findReleaseById,
-      now: nowInSeconds,
-    })
-    .sequenceS({
-      sessionKey: pipe(
-        fs.readFile(sessionKeyFilePath),
-        TE.fold(
-          () => authoriseAndCacheSessionKey,
-          flow(String, (_) => lfm.SessionKey.wrap(_), TE.right),
+  nowInSeconds,
+  TE.bindTo('now'),
+  TE.apS('release', findReleaseById),
+  TE.apSW(
+    'sessionKey',
+    pipe(
+      fs.readFile(sessionKeyFilePath),
+      TE.fold(
+        () => authoriseAndCacheSessionKey,
+        flow(String, (_) => lfm.SessionKey.wrap(_), TE.right),
+      ),
+    ),
+  ),
+  TE.chainFirst(({ sessionKey, release, now }) =>
+    pipe(
+      logTE('Submitting tracks to Last.fm...'),
+      TE.chain(() =>
+        lfm.scrobble(
+          apiKey,
+          apiSecret,
+          sessionKey,
+          formatReleaseToLastFMTracks(release),
+          now,
         ),
       ),
-    })
-    .doL(({ sessionKey, release, now }) =>
-      pipe(
-        logTE('Submitting tracks to Last.fm...'),
-        TE.chain(() =>
-          lfm.scrobble(
-            apiKey,
-            apiSecret,
-            sessionKey,
-            formatReleaseToLastFMTracks(release),
-            now,
-          ),
-        ),
-      ),
-    )
-    .return(constVoid),
+    ),
+  ),
   TE.fold(
     (error) => logT(`Something went wrong: ${JSON.stringify(error)}`),
     () => logT('Success!'),
