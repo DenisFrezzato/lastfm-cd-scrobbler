@@ -1,18 +1,17 @@
-import * as E from 'fp-ts/Either'
 import * as C from 'fp-ts/Console'
 import * as Date from 'fp-ts/Date'
 import { flow } from 'fp-ts/function'
 import { pipe } from 'fp-ts/pipeable'
 import * as TE from 'fp-ts/TaskEither'
-import { IntFromString } from 'io-ts-types/lib/IntFromString'
-import { failure } from 'io-ts/lib/PathReporter'
+import * as T from 'fp-ts/Task'
 
 import * as dgs from './discogs'
 import * as fs from './fs'
 import * as lfm from './lastfm'
 import { waitForConfirm } from './readline'
-import { unexpectedValue, AppError } from './commonErrors'
-import * as T from 'fp-ts/Task'
+import { AppError } from './commonErrors'
+import { IntFromString } from './IntFromString'
+import { failureToError } from './error'
 
 const sessionKeyFilePath = `${__dirname}/.sessionKey`
 
@@ -23,11 +22,7 @@ const logTE = flow(C.log, TE.rightIO)
 const logT = flow(C.log, T.fromIO)
 
 function decodeReleaseId(u: unknown): TE.TaskEither<AppError, number> {
-  return pipe(
-    IntFromString.decode(u),
-    E.mapLeft((errors) => unexpectedValue(failure(errors).join('\n'))),
-    TE.fromEither,
-  )
+  return pipe(IntFromString.decode(u), failureToError, TE.fromEither)
 }
 
 const nowInSeconds: TE.TaskEither<never, number> = TE.taskEither.map(
@@ -68,15 +63,16 @@ const authoriseAndCacheSessionKey: TE.TaskEither<
   TE.map((s) => s.sessionKey),
 )
 
-const formatReleaseToLastFMTracks = (
+function formatReleaseToLastFMTracks(
   release: dgs.ReleaseResponse,
-): lfm.Track[] =>
-  release.tracklist.map((track) => ({
+): lfm.Track[] {
+  return release.tracklist.map((track) => ({
     artist: release.artists[0].name,
     track: track.title,
-    trackNumber: parseInt(track.position, 10),
+    trackNumber: track.position,
     album: release.title,
   }))
+}
 
 export const main: T.Task<void> = pipe(
   nowInSeconds,
