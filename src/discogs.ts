@@ -3,6 +3,7 @@ import * as D from 'io-ts/lib/Decoder'
 
 import { fetchJson } from './fetch'
 import { AppError } from './commonErrors'
+import { IntFromString } from './IntFromString'
 
 function createUrl(endpoint: string) {
   return `https://api.discogs.com${endpoint}`
@@ -18,7 +19,7 @@ const ReleaseResponse = D.type({
   tracklist: D.array(
     D.type({
       duration: D.string,
-      position: D.string,
+      position: IntFromString,
       title: D.string,
     }),
   ),
