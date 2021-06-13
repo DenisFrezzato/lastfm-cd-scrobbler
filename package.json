@@ -26,13 +26,13 @@
   "author": "Denis Frezzato <denis.frezzato@tutanota.com>",
   "license": "MIT",
   "dependencies": {
-    "fp-ts": "^2.8.1",
+    "fp-ts": "^2.10.5",
     "io-ts": "^2.0.1",
     "io-ts-types": "^0.5.9",
     "md5": "^2.3.0",
-    "monocle-ts": "^2.3.3",
+    "monocle-ts": "^2.3.10",
     "newtype-ts": "^0.3.4",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.1",
     "open": "^7.1.0"
   },
   "devDependencies": {
