@@ -30,7 +30,7 @@ const nowInSeconds: TE.TaskEither<never, number> = TE.taskEither.map(
   (ms) => Math.floor(ms / 1000),
 )
 
-const findReleaseById: TE.TaskEither<AppError, dgs.ReleaseResponse> = pipe(
+const findReleaseById: TE.TaskEither<AppError, dgs.Release> = pipe(
   decodeReleaseId(process.argv[2]),
   TE.bindTo('releaseId'),
   TE.bind('release', ({ releaseId }) => dgs.findRelease(releaseId)),
@@ -63,9 +63,7 @@ const authoriseAndCacheSessionKey: TE.TaskEither<
   TE.map((s) => s.sessionKey),
 )
 
-function formatReleaseToLastFMTracks(
-  release: dgs.ReleaseResponse,
-): lfm.Track[] {
+function formatReleaseToLastFMTracks(release: dgs.Release): lfm.Track[] {
   return release.tracklist.map((track) => ({
     artist: release.artists[0].name,
     track: track.title,
